@@ -77,26 +77,23 @@ public class Inventory
         get
         {
             List<int> result = new();
-            for (int i = 0; i < Items.Length; i++)
-            {
+            for (var i = 0; i < Items.Length; i++)
                 if (Items[i] is null)
-                {
                     result.Add(i);
-                }
-            }
             return result;
         }
     }
 
     /// <summary>
-    /// Changes size based on deltaSize
-    /// Can be positive or negative
+    ///     Changes size based on deltaSize
+    ///     Can be positive or negative
     /// </summary>
     /// <param name="deltaSize"></param>
     /// <returns>List of items that was removed by removing slots</returns>
     public List<IItem> ChangeSize(int deltaSize)
     {
-        if (deltaSize + Items.Length < 0) throw new ArgumentException("Value is too low. deltaSize can't be less than -Items.Length");
+        if (deltaSize + Items.Length < 0)
+            throw new ArgumentException("Value is too low. deltaSize can't be less than -Items.Length");
         List<IItem> removedItems = new();
         for (var i = Items.Length - deltaSize; i < Items.Length; i++)
         {
@@ -193,23 +190,25 @@ public class Inventory
     }
 
     /// <summary>
-    /// Tries to insert item into specified slot
+    ///     Tries to insert item into specified slot
     /// </summary>
     /// <param name="addable">Item to insert</param>
     /// <param name="index">Index of slot in which an item will be inserted</param>
     /// <typeparam name="T">Type of addable</typeparam>
-    /// <returns>Insertion info containing operation results as well as addable item.
-    /// If inserted item is an itemStack, it's amount represents how much items did NOT fit in the inventory
-    /// Inserted item will be provided even if insertion has failed! </returns>
+    /// <returns>
+    ///     Insertion info containing operation results as well as addable item.
+    ///     If inserted item is an itemStack, it's amount represents how much items did NOT fit in the inventory
+    ///     Inserted item will be provided even if insertion has failed!
+    /// </returns>
     public InsertionInfo<T> InsertItem<T>(T addable, int index) where T : IItem
     {
-        InsertionInfo<T> insertionInfo = new InsertionInfo<T>()
+        var insertionInfo = new InsertionInfo<T>
         {
             FitInOccupiedSlots = false,
             FitInInventory = false,
             InsertedItem = addable
         };
-        IItem? item = Items[index];
+        var item = Items[index];
         if (item is null)
         {
             Items[index] = addable;
@@ -218,11 +217,11 @@ public class Inventory
             OnItemInserted(new ItemAddedEventArgs(addable, null, true, true));
             return insertionInfo;
         }
-        
+
         if (addable is not IItemStack addableStack)
         {
             insertionInfo.FitInOccupiedSlots = false;
-            insertionInfo.FitInInventory = false;            
+            insertionInfo.FitInInventory = false;
             OnItemInserted(new ItemAddedEventArgs(null, addable, false, false));
             return insertionInfo;
         }
@@ -235,19 +234,19 @@ public class Inventory
             return insertionInfo;
         }
 
-        IItemStack itemStack = (IItemStack) item;
-        int spaceLeft = itemStack.MaxStackSize - itemStack.Amount;
-        int deltaAmount = Math.Min(spaceLeft, addableStack.Amount);
+        var itemStack = (IItemStack) item;
+        var spaceLeft = itemStack.MaxStackSize - itemStack.Amount;
+        var deltaAmount = Math.Min(spaceLeft, addableStack.Amount);
         itemStack.Amount += deltaAmount;
         addableStack.Amount -= deltaAmount;
-        IItemStack insertedStack = (IItemStack)addableStack.Clone();
+        var insertedStack = (IItemStack) addableStack.Clone();
         insertedStack.Amount = deltaAmount;
         OnItemInserted(new ItemAddedEventArgs(insertedStack, addable, false, false));
-        return new InsertionInfo<T>()
+        return new InsertionInfo<T>
         {
             InsertedItem = addable,
             FitInInventory = addableStack.Amount == 0,
-            FitInOccupiedSlots = addableStack.Amount == 0,
+            FitInOccupiedSlots = addableStack.Amount == 0
         };
     }
 
@@ -283,11 +282,13 @@ public class Inventory
                 var itemStack = (IItemStack) item;
                 havingAmount += itemStack.Amount;
             }
+
             if (havingAmount < targetAmount)
-            {            
+            {
                 OnItemRemoved(new ItemRemovedEventArgs(false, takeable));
                 return false;
             }
+
             foreach (var item in NotNullItems())
             {
                 if (!AreSameItems(takeable, item)) continue;
@@ -308,6 +309,7 @@ public class Inventory
                 OnItemRemoved(new ItemRemovedEventArgs(false, takeable));
                 return false;
             }
+
             Items[itemIndex] = null;
             OnItemRemoved(new ItemRemovedEventArgs(true, takeable));
             return true;
@@ -317,13 +319,13 @@ public class Inventory
     }
 
     /// <summary>
-    /// Tries to remove an item from a provided slot
+    ///     Tries to remove an item from a provided slot
     /// </summary>
     /// <param name="index">Index of slot from which an item will be removed</param>
     /// <returns>Removed item?</returns>
     public IItem? RemoveItem(int index)
     {
-        IItem? result = Items[index];
+        var result = Items[index];
         Items[index] = null;
         OnItemRemoved(new ItemRemovedEventArgs(result is null, result));
         return result;
