@@ -1,17 +1,17 @@
-﻿namespace InventorySystem;
+﻿// ReSharper disable MemberCanBePrivate.Global
+
+namespace InventorySystem;
 
 public class MultiComparator : IComparer<IItem?>
 {
     private string _currentComparator;
 
-    // ReSharper disable once MemberCanBePrivate.Global
-    public MultiComparator(Dictionary<string, Func<IItem, IItem, int>> comparators)
+    public MultiComparator(Dictionary<string, Func<IItem, IItem, int>> comparators, string initialComparator)
     {
         Comparators = comparators;
-        _currentComparator = Comparators.Keys.ToArray()[0];
+        _currentComparator = initialComparator;
     }
 
-    // ReSharper disable once MemberCanBePrivate.Global
     public string CurrentComparator
     {
         get => _currentComparator;
@@ -35,6 +35,6 @@ public class MultiComparator : IComparer<IItem?>
 
     public static MultiComparator CreateBlank()
     {
-        return new MultiComparator(new Dictionary<string, Func<IItem, IItem, int>>());
+        return new MultiComparator(new Dictionary<string, Func<IItem, IItem, int>>(), string.Empty);
     }
 }

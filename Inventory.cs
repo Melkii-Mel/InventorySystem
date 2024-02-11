@@ -52,9 +52,9 @@ public class Inventory
         {
             foreach (var item in Items)
                 if (item is null)
-                    return true;
+                    return false;
 
-            return false;
+            return true;
         }
     }
 
@@ -263,13 +263,13 @@ public class Inventory
     /// <param name="takeable">The item to be removed from the inventory.</param>
     /// <typeparam name="T">The type of the item to be removed.</typeparam>
     /// <returns>True if the item was successfully removed; otherwise, false.</returns>
-    public bool TryTakeItem<T>(T takeable) where T : IItem, new()
+    public bool TryTakeItem<T>(T takeable) where T : IItem
     {
         if (takeable is IItemStack takeableStack)
         {
             var targetAmount = takeableStack.Amount;
             var havingAmount = 0;
-            foreach (var item in NotNullItems())
+            foreach (var item in NotNullItems(true))
             {
                 if (!AreSameItems(takeable, item)) continue;
                 var itemStack = (IItemStack) item;
@@ -282,7 +282,7 @@ public class Inventory
                 return false;
             }
 
-            foreach (var item in NotNullItems())
+            foreach (var item in NotNullItems(true))
             {
                 if (!AreSameItems(takeable, item)) continue;
                 var itemStack = (IItemStack) item;
@@ -290,13 +290,15 @@ public class Inventory
                 itemStack.Amount -= deltaAmount;
                 takeableStack.Amount -= deltaAmount;
                 if (itemStack.Amount == 0) RemoveItemFromArray(itemStack);
-                OnItemRemoved(new ItemRemovedEventArgs(true, takeable));
-                if (takeableStack.Amount <= 0) return true;
+                if (takeableStack.Amount > 0) continue;
+                takeableStack.Amount = targetAmount;
+                OnItemRemoved(new ItemRemovedEventArgs(true, takeableStack));
+                return true;
             }
         }
         else
         {
-            var itemIndex = FindItem(takeable.Type.Id);
+            var itemIndex = FindItem(takeable.Type.Id, true);
             if (itemIndex == -1)
             {
                 OnItemRemoved(new ItemRemovedEventArgs(false, takeable));
@@ -398,13 +400,21 @@ public class Inventory
 
     #region Helpers
 
-    private IEnumerable<IItem> NotNullItems()
+    private IEnumerable<IItem> NotNullItems(bool backwards = false)
     {
-        foreach (var item in Items)
-        {
-            if (item is null) continue;
-            yield return item;
-        }
+        if (backwards)
+            for (var index = Items.Length - 1; index >= 0; index--)
+            {
+                var item = Items[index];
+                if (item is null) continue;
+                yield return item;
+            }
+        else
+            foreach (var item in Items)
+            {
+                if (item is null) continue;
+                yield return item;
+            }
     }
 
     private int FindFirstEmptySlot()
@@ -432,9 +442,9 @@ public class Inventory
         }
     }
 
-    private int FindItem(int index)
+    private int FindItem(int index, bool backwards = false)
     {
-        for (var i = 0; i < Items.Length; i++)
+        for (var i = backwards ? Items.Length - 1 : 0; backwards ? i > -1 : i < _items.Length; i += backwards ? -1 : 1)
         {
             var item = Items[i];
             if (item != null && item.Type.Id == index) return i;
