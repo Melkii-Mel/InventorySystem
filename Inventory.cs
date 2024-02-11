@@ -14,12 +14,12 @@ public class Inventory
     private IItem?[] _items;
 
     /// <summary>
-    ///     Initializes a new Inventory with the set size
+    ///     Initializes a new instance of the Inventory class with the specified size.
     /// </summary>
-    /// <param name="size">Size of the inventory</param>
+    /// <param name="size">The size of the inventory.</param>
     /// <param name="comparator">
-    ///     MultiComparator for providing different ways of sorting.
-    ///     If sorting is not implemented, use Comparator.CreateBlank()
+    ///     A MultiComparator object used for sorting items in the inventory.
+    ///     If sorting is not required, use MultiComparator.CreateBlank().
     /// </param>
     public Inventory(int size, MultiComparator comparator)
     {
@@ -40,10 +40,12 @@ public class Inventory
     // ReSharper disable once MemberCanBePrivate.Global
     public MultiComparator Comparator { get; set; }
 
-    // ReSharper disable once MemberCanBePrivate.Global
     /// <summary>
-    ///     Checks if inventory has empty slots in it
+    ///     Gets a value indicating whether the inventory is full.
     /// </summary>
+    /// <remarks>
+    ///     Returns true if all slots in the inventory are occupied; otherwise, false.
+    /// </remarks>
     public bool IsFull
     {
         get
@@ -57,7 +59,7 @@ public class Inventory
     }
 
     /// <summary>
-    ///     Returns the amount of empty slots in an inventory
+    ///     Gets the number of empty slots in the inventory.
     /// </summary>
     public int EmptySlotsAmount
     {
@@ -72,6 +74,9 @@ public class Inventory
         }
     }
 
+    /// <summary>
+    ///     Gets a list of indexes representing empty slots in the inventory.
+    /// </summary>
     public List<int> EmptySlots
     {
         get
@@ -85,11 +90,10 @@ public class Inventory
     }
 
     /// <summary>
-    ///     Changes size based on deltaSize
-    ///     Can be positive or negative
+    ///     Changes the size of the inventory by the specified deltaSize.
     /// </summary>
-    /// <param name="deltaSize"></param>
-    /// <returns>List of items that was removed by removing slots</returns>
+    /// <param name="deltaSize">The change in size, which can be positive or negative.</param>
+    /// <returns>A list of items that were removed due to slot resizing.</returns>
     public List<IItem> ChangeSize(int deltaSize)
     {
         if (deltaSize + Items.Length < 0)
@@ -108,15 +112,11 @@ public class Inventory
     }
 
     /// <summary>
-    ///     Adds an item to the inventory
+    ///     Inserts an item into the inventory.
     /// </summary>
-    /// <param name="addable">Item you want to add to an inventory</param>
-    /// <typeparam name="T">IItem type</typeparam>
-    /// <returns>
-    ///     Insertion info containing operation result as well as Inserted Item
-    ///     If inserted item is an itemStack, it's amount represents how much items did NOT fit in the inventory
-    ///     Inserted item will be provided even if insertion has failed!
-    /// </returns>
+    /// <param name="addable">The item to be added to the inventory.</param>
+    /// <typeparam name="T">Specific type of implementor of IItem</typeparam>
+    /// <returns>An InsertionInfo object containing information about the insertion operation.</returns>
     public InsertionInfo<T> InsertItem<T>(T addable) where T : IItem
     {
         var insertionInfo = new InsertionInfo<T>
@@ -131,12 +131,9 @@ public class Inventory
             var totalAmount = addableStack.Amount;
             foreach (var item in NotNullItems())
             {
-                if (item.Id != addableStack.Id) continue;
+                if (item.Type != addableStack.Type) continue;
                 var itemStack = (IItemStack) item;
-                var spaceInSlot = itemStack.MaxStackSize - itemStack.Amount;
-                var deltaAmount = Math.Min(spaceInSlot, addableStack.Amount);
-                itemStack.Amount += deltaAmount;
-                addableStack.Amount -= deltaAmount;
+                addableStack = itemStack.Stack(addableStack);
                 if (addableStack.Amount == 0) break;
             }
 
@@ -152,7 +149,7 @@ public class Inventory
             if (IsFull)
             {
                 insertionInfo.FitInInventory = false;
-                var insertedItems = (IItemStack) addableStack.Clone();
+                var insertedItems = addableStack;
                 insertedItems.Amount = totalAmount - addableStack.Amount;
                 OnItemInserted(new ItemAddedEventArgs(insertedItems, addableStack, !insertionInfo.FitInOccupiedSlots,
                     true));
@@ -161,15 +158,15 @@ public class Inventory
 
             while (addableStack.Amount > 0)
             {
-                var newStack = (IItemStack) addable.Clone();
-                var deltaAmount = Math.Min(addableStack.MaxStackSize, addableStack.Amount);
+                var newStack = addableStack;
+                var deltaAmount = Math.Min(addableStack.Type.MaxStackSize, addableStack.Amount);
                 newStack.Amount = deltaAmount;
                 addableStack.Amount -= deltaAmount;
                 Items[FindFirstEmptySlot()] = newStack;
                 if (IsFull) break;
             }
 
-            var itemsInserted = (IItemStack) addableStack.Clone();
+            var itemsInserted = addableStack;
             itemsInserted.Amount = totalAmount - addableStack.Amount;
             OnItemInserted(new ItemAddedEventArgs(itemsInserted, addableStack, !insertionInfo.FitInOccupiedSlots,
                 insertionInfo.FitInInventory));
@@ -194,11 +191,9 @@ public class Inventory
     /// </summary>
     /// <param name="addable">Item to insert</param>
     /// <param name="index">Index of slot in which an item will be inserted</param>
-    /// <typeparam name="T">Type of addable</typeparam>
+    /// <typeparam name="T">Specific type of implementor of IItem</typeparam>
     /// <returns>
-    ///     Insertion info containing operation results as well as addable item.
-    ///     If inserted item is an itemStack, it's amount represents how much items did NOT fit in the inventory
-    ///     Inserted item will be provided even if insertion has failed!
+    ///     An InsertionInfo object containing information about the insertion operation
     /// </returns>
     public InsertionInfo<T> InsertItem<T>(T addable, int index) where T : IItem
     {
@@ -235,13 +230,11 @@ public class Inventory
         }
 
         var itemStack = (IItemStack) item;
-        var spaceLeft = itemStack.MaxStackSize - itemStack.Amount;
-        var deltaAmount = Math.Min(spaceLeft, addableStack.Amount);
-        itemStack.Amount += deltaAmount;
-        addableStack.Amount -= deltaAmount;
-        var insertedStack = (IItemStack) addableStack.Clone();
-        insertedStack.Amount = deltaAmount;
-        OnItemInserted(new ItemAddedEventArgs(insertedStack, addable, false, false));
+        var initialAmount = addableStack.Amount;
+        addableStack = itemStack.Stack(addableStack);
+        var insertedStack = addableStack;
+        insertedStack.Amount = initialAmount - addableStack.Amount;
+        OnItemInserted(new ItemAddedEventArgs(insertedStack, addableStack, false, addableStack.Amount == 0));
         return new InsertionInfo<T>
         {
             InsertedItem = addable,
@@ -265,12 +258,12 @@ public class Inventory
     }
 
     /// <summary>
-    ///     Tries to remove a takeable from the inventory
+    ///     Tries to remove an item from the inventory.
     /// </summary>
-    /// <param name="takeable">Item to remove</param>
-    /// <typeparam name="T">Type of IItem</typeparam>
-    /// <returns>true if items were removed successfully, false otherwise (if inventory didn't have enough items in it)</returns>
-    public bool RemoveItem<T>(T takeable) where T : IItem, new()
+    /// <param name="takeable">The item to be removed from the inventory.</param>
+    /// <typeparam name="T">The type of the item to be removed.</typeparam>
+    /// <returns>True if the item was successfully removed; otherwise, false.</returns>
+    public bool TryTakeItem<T>(T takeable) where T : IItem, new()
     {
         if (takeable is IItemStack takeableStack)
         {
@@ -303,7 +296,7 @@ public class Inventory
         }
         else
         {
-            var itemIndex = FindItem(takeable.Id);
+            var itemIndex = FindItem(takeable.Type.Id);
             if (itemIndex == -1)
             {
                 OnItemRemoved(new ItemRemovedEventArgs(false, takeable));
@@ -323,7 +316,7 @@ public class Inventory
     /// </summary>
     /// <param name="index">Index of slot from which an item will be removed</param>
     /// <returns>Removed item?</returns>
-    public IItem? RemoveItem(int index)
+    public IItem? TryTakeItem(int index)
     {
         var result = Items[index];
         Items[index] = null;
@@ -332,7 +325,7 @@ public class Inventory
     }
 
     /// <summary>
-    ///     Sorts items by the comparator with the Comparator.CurrentComparator name
+    ///     Sorts the items in the inventory using the current comparator.
     /// </summary>
     public void SortItems()
     {
@@ -341,9 +334,9 @@ public class Inventory
     }
 
     /// <summary>
-    ///     Sorts items by the comparator with the comparatorName name
+    ///     Sorts the items in the inventory using the specified comparator.
     /// </summary>
-    /// <param name="comparatorName">name of the comparator that will be used</param>
+    /// <param name="comparatorName">The name of the comparator to be used for sorting.</param>
     public void SortItems(string comparatorName)
     {
         var currentName = Comparator.CurrentComparator;
@@ -353,10 +346,10 @@ public class Inventory
     }
 
     /// <summary>
-    ///     Filter items using a predicate parameter
+    ///     Filters the items in the inventory using the specified predicate.
     /// </summary>
-    /// <param name="predicate">Expression that works as a filter</param>
-    /// <returns>Filtered array of items</returns>
+    /// <param name="predicate">The predicate used to filter the items.</param>
+    /// <returns>An array of items that satisfy the predicate condition.</returns>
     public IItem[] FilterItems(Func<IItem, bool> predicate)
     {
         IItem[] result = Items.Where(item => item != null && predicate(item)).ToArray()!;
@@ -369,11 +362,15 @@ public class Inventory
     /// </summary>
     public struct InsertionInfo<T> where T : IItem
     {
-        // ReSharper disable once UnusedAutoPropertyAccessor.Global
         /// <summary>
         ///     Item that has been inserted
         /// </summary>
-        public T InsertedItem { get; internal set; }
+        public T? InsertedItem { get; internal set; }
+
+        /// <summary>
+        ///     Item that has not been inserted due to lack of space
+        /// </summary>
+        public T? RejectedItem { get; internal set; }
 
         /// <summary>
         ///     True if item was successfully inserted in the inventory
@@ -421,7 +418,7 @@ public class Inventory
 
     private bool AreSameItems(IItem item0, IItem item1)
     {
-        return item0.Id == item1.Id;
+        return item0.Type.Id == item1.Type.Id;
     }
 
     private void RemoveItemFromArray(IItem removable)
@@ -440,7 +437,7 @@ public class Inventory
         for (var i = 0; i < Items.Length; i++)
         {
             var item = Items[i];
-            if (item != null && item.Id == index) return i;
+            if (item != null && item.Type.Id == index) return i;
         }
 
         return -1;
@@ -508,16 +505,16 @@ public class Inventory
 
     public class ItemSwappedEventArgs : EventArgs
     {
-        public ItemSwappedEventArgs(bool isAnythingRemoved, IItem? removedItem, IItem insertedItem)
+        public ItemSwappedEventArgs(bool isAnythingRemoved, IItem? removedItem, IItem insertedItemType)
         {
             IsAnythingRemoved = isAnythingRemoved;
             RemovedItem = removedItem;
-            InsertedItem = insertedItem;
+            InsertedItemType = insertedItemType;
         }
 
         public bool IsAnythingRemoved { get; }
         public IItem? RemovedItem { get; }
-        public IItem InsertedItem { get; }
+        public IItem InsertedItemType { get; }
     }
 
     protected virtual void OnInventorySizeChanged(InventorySizeChangedEventArgs args)
