@@ -9,10 +9,8 @@ namespace InventorySystem;
 ///     Stackable items represented as IItemStack inheritors
 /// </summary>
 [Serializable]
-public class Inventory
+public partial class Inventory
 {
-    private IItem?[] _items;
-
     /// <summary>
     ///     Initializes a new instance of the Inventory class with the specified size.
     /// </summary>
@@ -260,61 +258,94 @@ public class Inventory
     /// <summary>
     ///     Tries to remove an item from the inventory.
     /// </summary>
-    /// <param name="takeable">The item to be removed from the inventory.</param>
+    /// <param name="takeables">Items to be removed from the inventory</param>
     /// <typeparam name="T">The type of the item to be removed.</typeparam>
     /// <returns>True if the item was successfully removed; otherwise, false.</returns>
-    public bool TryTakeItem<T>(T takeable) where T : IItem
+    public bool TryTakeItems<T>(params T[] takeables) where T : IItem
     {
-        if (takeable is IItemStack takeableStack)
+        int[] takeablesAmounts = new int[takeables.Length];
+        for (var i = 0; i < takeables.Length; i++)
         {
-            var targetAmount = takeableStack.Amount;
-            var havingAmount = 0;
-            foreach (var item in NotNullItems(true))
-            {
-                if (!AreSameItems(takeable, item)) continue;
-                var itemStack = (IItemStack) item;
-                havingAmount += itemStack.Amount;
-            }
-
-            if (havingAmount < targetAmount)
-            {
-                OnItemRemoved(new ItemRemovedEventArgs(false, takeable));
-                return false;
-            }
-
-            foreach (var item in NotNullItems(true))
-            {
-                if (!AreSameItems(takeable, item)) continue;
-                var itemStack = (IItemStack) item;
-                var deltaAmount = Math.Min(itemStack.Amount, targetAmount);
-                itemStack.Amount -= deltaAmount;
-                takeableStack.Amount -= deltaAmount;
-                if (itemStack.Amount == 0) RemoveItemFromArray(itemStack);
-                if (takeableStack.Amount > 0) continue;
-                takeableStack.Amount = targetAmount;
-                OnItemRemoved(new ItemRemovedEventArgs(true, takeableStack));
-                return true;
-            }
-        }
-        else
-        {
-            var itemIndex = FindItem(takeable.Type.Id, true);
-            if (itemIndex == -1)
-            {
-                OnItemRemoved(new ItemRemovedEventArgs(false, takeable));
-                return false;
-            }
-
-            Items[itemIndex] = null;
-            OnItemRemoved(new ItemRemovedEventArgs(true, takeable));
-            return true;
+            var takeable = takeables[i];
+            takeablesAmounts[i] = takeable is IItemStack takeableStack ? takeableStack.Amount : 1;
         }
 
-        return false;
+        foreach(var item in NotNullItems(true))
+        {
+            if (item is IItemStack itemStack)
+            {
+                for (var i = 0; i < takeables.Length; i++)
+                {
+                    var takeable = takeables[i];
+                    if (!AreSameItems(takeable, item)) continue;
+                    var deltaAmount = Math.Min(itemStack.Amount, takeablesAmounts[i]);
+                    takeablesAmounts[i] -= deltaAmount;
+                    itemStack.Amount -= deltaAmount;
+                    if (itemStack.Amount == 0) break;
+                }
+            }
+            else
+            {
+                for (var i = 0; i < takeables.Length; i++)
+                {
+                    if (!AreSameItems(takeables[i], item)) continue;
+                    takeablesAmounts[i] = 0;
+                    break;
+                }
+            }
+        }
+        if (takeablesAmounts.Count(a => a != 0) != 0) return false;
+
+        for (int i = _items.Length - 1; i > -1; i++)
+        {
+            var item = _items[i];
+            if (item is null) continue;
+            foreach (var takeable in takeables)
+            {
+                if (!AreSameItems(takeable, item)) continue;
+                if (takeable is IItemStack takeableStack && item is IItemStack itemStack)
+                {
+                    var deltaAmount = Math.Min(takeableStack.Amount, itemStack.Amount);
+                    ((IItemStack) _items[i]!).Amount -= deltaAmount;
+                    if (((IItemStack) _items[i]!).Amount == 0) break;
+                }
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
-    ///     Tries to remove an item from a provided slot
+    /// returns all items with the specified Item Type
+    /// </summary>
+    /// <param name="type">Type of receivable items</param>
+    public IItem[] GetItems(IItemType type)
+    {
+        return Items.Where(item => item is not null && item.Type == type).ToArray()!;
+    }
+
+    /// <summary>
+    /// returns amount of items in the inventory
+    /// With IItemStack, returns amount of separated stack
+    /// If you want to find the exact amount of items in stacks, use GetStackableItemsAmount
+    /// </summary>
+    /// <param name="type">Type of items you want to count</param>
+    public int GetItemsAmount(IItemType type)
+    {
+        return GetItems(type).Length;
+    }
+
+    /// <summary>
+    /// Returns amount of items of the specified type in all stacks
+    /// </summary>
+    /// <param name="type">Type of items you want to count</param>
+    public int GetStackableItemsAmount(IItemStackType type)
+    {
+        return ((IItemStack[])GetItems(type)).Select(item => item.Amount).Sum();
+    }
+
+    /// <summary>
+    /// Removes an item from the inventory if there is any, then returns it
     /// </summary>
     /// <param name="index">Index of slot from which an item will be removed</param>
     /// <returns>Removed item?</returns>
@@ -386,176 +417,4 @@ public class Inventory
         // ReSharper disable once UnusedAutoPropertyAccessor.Global
         public bool FitInOccupiedSlots { get; internal set; }
     }
-
-    #region Events
-
-    public event EventHandler? InventorySizeChanged;
-    public event EventHandler? ItemInserted;
-    public event EventHandler? ItemRemoved;
-    public event EventHandler? FilterApplied;
-    public event EventHandler? InventorySorted;
-    public event EventHandler? ItemSwapped;
-
-    #endregion
-
-    #region Helpers
-
-    private IEnumerable<IItem> NotNullItems(bool backwards = false)
-    {
-        if (backwards)
-            for (var index = Items.Length - 1; index >= 0; index--)
-            {
-                var item = Items[index];
-                if (item is null) continue;
-                yield return item;
-            }
-        else
-            foreach (var item in Items)
-            {
-                if (item is null) continue;
-                yield return item;
-            }
-    }
-
-    private int FindFirstEmptySlot()
-    {
-        for (var i = 0; i < Items.Length; i++)
-            if (Items[i] is null)
-                return i;
-
-        return -1;
-    }
-
-    private bool AreSameItems(IItem item0, IItem item1)
-    {
-        return item0.Type.Id == item1.Type.Id;
-    }
-
-    private void RemoveItemFromArray(IItem removable)
-    {
-        for (var i = 0; i < Items.Length; i++)
-        {
-            var item = Items[i];
-            if (item == null || !item.Equals(removable)) continue;
-            Items[i] = null;
-            return;
-        }
-    }
-
-    private int FindItem(int index, bool backwards = false)
-    {
-        for (var i = backwards ? Items.Length - 1 : 0; backwards ? i > -1 : i < _items.Length; i += backwards ? -1 : 1)
-        {
-            var item = Items[i];
-            if (item != null && item.Type.Id == index) return i;
-        }
-
-        return -1;
-    }
-
-    #endregion
-
-    #region EventHandlers
-
-    public class InventorySizeChangedEventArgs : EventArgs
-    {
-        public InventorySizeChangedEventArgs(int deltaSize, int newSize, int prevSize, List<IItem> removedItems)
-        {
-            DeltaSize = deltaSize;
-            NewSize = newSize;
-            PrevSize = prevSize;
-            RemovedItems = removedItems;
-        }
-
-        public int PrevSize { get; }
-        public int NewSize { get; }
-        public int DeltaSize { get; }
-        public List<IItem> RemovedItems { get; }
-    }
-
-    public class ItemAddedEventArgs : EventArgs
-    {
-        public ItemAddedEventArgs(IItem? addedItems, IItem? rejectedItems, bool occupiedNewSlots, bool fitInInventory)
-        {
-            AddedItems = addedItems;
-            RejectedItems = rejectedItems;
-            OccupiedNewSlots = occupiedNewSlots;
-            FitInInventory = fitInInventory;
-        }
-
-        public IItem? AddedItems { get; }
-        public IItem? RejectedItems { get; }
-        public bool OccupiedNewSlots { get; }
-        public bool FitInInventory { get; }
-    }
-
-    public class ItemRemovedEventArgs : EventArgs
-    {
-        public ItemRemovedEventArgs(bool removed, IItem? removable)
-        {
-            Removed = removed;
-            Removable = removable;
-        }
-
-        public IItem? Removable { get; }
-        public bool Removed { get; }
-    }
-
-    public class FilterAppliedEventArgs : EventArgs
-    {
-        public FilterAppliedEventArgs(Func<IItem, bool> filter, IItem[] result)
-        {
-            Filter = filter;
-            Result = result;
-        }
-
-        public Func<IItem, bool> Filter { get; }
-        public IItem[] Result { get; }
-    }
-
-    public class ItemSwappedEventArgs : EventArgs
-    {
-        public ItemSwappedEventArgs(bool isAnythingRemoved, IItem? removedItem, IItem insertedItemType)
-        {
-            IsAnythingRemoved = isAnythingRemoved;
-            RemovedItem = removedItem;
-            InsertedItemType = insertedItemType;
-        }
-
-        public bool IsAnythingRemoved { get; }
-        public IItem? RemovedItem { get; }
-        public IItem InsertedItemType { get; }
-    }
-
-    protected virtual void OnInventorySizeChanged(InventorySizeChangedEventArgs args)
-    {
-        InventorySizeChanged?.Invoke(this, args);
-    }
-
-    protected virtual void OnItemInserted(ItemAddedEventArgs args)
-    {
-        ItemInserted?.Invoke(this, args);
-    }
-
-    protected virtual void OnItemRemoved(ItemRemovedEventArgs args)
-    {
-        ItemRemoved?.Invoke(this, args);
-    }
-
-    protected virtual void OnFilterApplied(FilterAppliedEventArgs args)
-    {
-        FilterApplied?.Invoke(this, args);
-    }
-
-    protected virtual void OnInventorySorted()
-    {
-        InventorySorted?.Invoke(this, EventArgs.Empty);
-    }
-
-    protected virtual void OnItemSwapped(ItemSwappedEventArgs args)
-    {
-        ItemSwapped?.Invoke(this, args);
-    }
-
-    #endregion
 }

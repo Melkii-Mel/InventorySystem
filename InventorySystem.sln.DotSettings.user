@@ -13,4 +13,5 @@
   &lt;Project Location="E:\Projects\.netstandard\.dll\InventorySystemTests" Presentation="&amp;lt;InventorySystemTests&amp;gt;" /&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
 	<s:Boolean x:Key="/Default/UserDictionary/Words/=objss/@EntryIndexedValue">True</s:Boolean>
-	<s:Boolean x:Key="/Default/UserDictionary/Words/=takeable/@EntryIndexedValue">True</s:Boolean></wpf:ResourceDictionary>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=takeable/@EntryIndexedValue">True</s:Boolean>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=takeables/@EntryIndexedValue">True</s:Boolean></wpf:ResourceDictionary>

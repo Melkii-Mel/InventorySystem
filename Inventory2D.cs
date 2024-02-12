@@ -131,9 +131,9 @@ public class Inventory2D
         return _inventory.SwapItems(insertable, ConvertToIndex(slot));
     }
 
-    public bool TryTakeItem<T>(T removable) where T : IItem
+    public bool TryTakeItems<T>(params T[] removable) where T : IItem
     {
-        return _inventory.TryTakeItem(removable);
+        return _inventory.TryTakeItems(removable);
     }
 
     public IItem? TryTakeItem(Vector2 position)
@@ -154,6 +154,11 @@ public class Inventory2D
     public IItem[] FilterItems(Func<IItem, bool> predicate)
     {
         return _inventory.FilterItems(predicate);
+    }
+
+    public IItem[] GetItems(IItemType type)
+    {
+        return _inventory.GetItems(type);
     }
 
     #region Events
