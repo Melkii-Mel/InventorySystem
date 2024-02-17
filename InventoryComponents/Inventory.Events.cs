@@ -1,7 +1,9 @@
 ﻿// ReSharper disable UnusedAutoPropertyAccessor.Global
 // ReSharper disable MemberCanBePrivate.Global
 
-namespace InventorySystem;
+using InventorySystem.Interfaces;
+
+namespace InventorySystem.InventoryComponents;
 
 public partial class Inventory<TItem> where TItem : struct, IItem
 {

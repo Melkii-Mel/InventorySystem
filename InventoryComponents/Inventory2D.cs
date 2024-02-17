@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
+using InventorySystem.Interfaces;
 
-namespace InventorySystem;
+namespace InventorySystem.InventoryComponents;
 
 /// <summary>
 ///     Two-dimensional wrapper for an inventory that allows you to access cells by their row and column

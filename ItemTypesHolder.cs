@@ -1,4 +1,6 @@
-﻿namespace InventorySystem;
+﻿using InventorySystem.Interfaces;
+
+namespace InventorySystem;
 
 /// <summary>
 ///     Represents a collection of item types with methods for retrieval, addition, and removal.

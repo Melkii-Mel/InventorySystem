@@ -12,6 +12,9 @@
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=3980e359_002D448f_002D4fcc_002D9f89_002D79a8f9d22cb2/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="All tests from &amp;lt;InventorySystemTests&amp;gt; #5" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;Project Location="E:\Projects\.netstandard\.dll\InventorySystemTests" Presentation="&amp;lt;InventorySystemTests&amp;gt;" /&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=70d5df67_002Daa70_002D4758_002D9a42_002Dbeb74d0f3864/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="All tests from &amp;lt;InventorySystemTests&amp;gt; #8" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;Project Location="E:\Projects\.netstandard\.dll\InventorySystemTests" Presentation="&amp;lt;InventorySystemTests&amp;gt;" /&gt;&#xD;
+&lt;/SessionState&gt;</s:String>
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=76fae0df_002D7337_002D4281_002Da759_002D21298a2ca054/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="All tests from &amp;lt;InventorySystemTests&amp;gt; #4" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;Project Location="E:\Projects\.netstandard\.dll\InventorySystemTests" Presentation="&amp;lt;InventorySystemTests&amp;gt;" /&gt;&#xD;
 &lt;/SessionState&gt;</s:String>

@@ -1,5 +1,7 @@
 ﻿// ReSharper disable MemberCanBePrivate.Global
 
+using InventorySystem.Interfaces;
+
 namespace InventorySystem;
 
 public class MultiComparator<TItem> : IComparer<TItem?> where TItem : struct, IItem

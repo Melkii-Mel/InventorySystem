@@ -1,7 +1,9 @@
 ﻿// ReSharper disable UnusedAutoPropertyAccessor.Global
 // ReSharper disable MemberCanBePrivate.Global
 
-namespace InventorySystem;
+using InventorySystem.Interfaces;
+
+namespace InventorySystem.InventoryComponents;
 
 /// <summary>
 ///     creates an inventory that can store items represented as an implementors of IItem
@@ -269,7 +271,8 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     {
         if (!IsEnoughItems(takeables)) return false;
 
-        IItem?[] takeablesSingles = takeables.Where(item => item is not IItemStack).Select(item => item as IItem).ToArray();
+        IItem?[] takeablesSingles =
+            takeables.Where(item => item is not IItemStack).Select(item => item as IItem).ToArray();
         var takeableStacks = takeables.OfType<IItemStack>().ToArray();
         for (var i = _items.Length - 1; i > -1; i--)
         {
@@ -326,7 +329,7 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     public bool IsEnoughItems(TItem[] initialTakeableItems)
     {
         var notNullItems = NotNullItems().ToArray();
-        var takeableItems = (TItem[])initialTakeableItems.Clone();
+        var takeableItems = (TItem[]) initialTakeableItems.Clone();
         var takeablesAmounts = new int[takeableItems.Length];
         for (var i = 0; i < takeableItems.Length; i++)
         {

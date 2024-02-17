@@ -1,4 +1,4 @@
-﻿namespace InventorySystem;
+﻿namespace InventorySystem.Interfaces;
 
 /// <summary>
 ///     Implement this interface to make a stackable item
