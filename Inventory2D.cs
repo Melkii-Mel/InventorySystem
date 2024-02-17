@@ -5,17 +5,17 @@ namespace InventorySystem;
 /// <summary>
 ///     Two-dimensional wrapper for an inventory that allows you to access cells by their row and column
 /// </summary>
-public class Inventory2D
+public class Inventory2D<TItem> where TItem : struct, IItem
 {
-    private readonly Inventory _inventory;
+    private readonly Inventory<TItem> _inventory;
     private int _sizeX;
     private int _sizeY;
 
-    public Inventory2D(int sizeX, int sizeY, MultiComparator? multiComparator = default)
+    public Inventory2D(int sizeX, int sizeY, MultiComparator<TItem>? multiComparator = default)
     {
         _sizeX = sizeX;
         _sizeY = sizeY;
-        _inventory = new Inventory(sizeX * sizeY, multiComparator ?? MultiComparator.CreateBlank());
+        _inventory = new Inventory<TItem>(sizeX * sizeY, multiComparator ?? MultiComparator<TItem>.CreateBlank());
         _inventory.FilterApplied += OnFilterApplied;
         _inventory.InventorySorted += OnInventorySorted;
         _inventory.InventorySizeChanged += OnInventorySizeChanged;
@@ -24,13 +24,13 @@ public class Inventory2D
         _inventory.ItemInserted += OnItemInserted;
     }
 
-    public IItem?[][] Items
+    public TItem?[][] Items
     {
         set => _inventory.Items = ConvertTo1D(value);
         get => ConvertTo2D(_inventory.Items, _sizeX);
     }
 
-    public MultiComparator Comparator
+    public MultiComparator<TItem> Comparator
     {
         get => _inventory.Comparator;
         set => _inventory.Comparator = value;
@@ -57,9 +57,9 @@ public class Inventory2D
         }
     }
 
-    public List<IItem> ChangeSize(int x, int y)
+    public List<TItem> ChangeSize(int x, int y)
     {
-        var result = new List<IItem>();
+        var result = new List<TItem>();
         result.AddRange(_inventory.ChangeSize(x * _sizeY));
         _sizeY = y;
         result.AddRange(_inventory.ChangeSize(y * _sizeX));
@@ -116,22 +116,22 @@ public class Inventory2D
         return (int) (coordinates.Y * sizeX + coordinates.X);
     }
 
-    public Inventory.InsertionInfo<T> InsertItem<T>(T item) where T : IItem
+    public Inventory<TItem>.InsertionInfo<TItem> InsertItem(TItem item)
     {
         return _inventory.InsertItem(item);
     }
 
-    public Inventory.InsertionInfo<T> InsertItem<T>(T item, Vector2 cell) where T : IItem
+    public Inventory<TItem>.InsertionInfo<TItem> InsertItem(TItem item, Vector2 cell)
     {
         return _inventory.InsertItem(item, ConvertToIndex(cell));
     }
 
-    public IItem? SwapItems(IItem insertable, Vector2 slot)
+    public TItem? SwapItems(TItem insertable, Vector2 slot)
     {
         return _inventory.SwapItems(insertable, ConvertToIndex(slot));
     }
 
-    public bool TryTakeItems<T>(params T[] removable) where T : IItem
+    public bool TryTakeItems(params TItem[] removable)
     {
         return _inventory.TryTakeItems(removable);
     }
@@ -151,12 +151,12 @@ public class Inventory2D
         _inventory.SortItems(comparatorName);
     }
 
-    public IItem[] FilterItems(Func<IItem, bool> predicate)
+    public TItem[] FilterItems(Func<TItem, bool> predicate)
     {
         return _inventory.FilterItems(predicate);
     }
 
-    public IItem[] GetItems(IItemType type)
+    public TItem[] GetItems(IItemType type)
     {
         return _inventory.GetItems(type);
     }

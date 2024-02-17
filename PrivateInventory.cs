@@ -1,25 +1,25 @@
 ﻿namespace InventorySystem;
 
-public partial class Inventory
+public partial class Inventory<TItem> where TItem : struct, IItem
 {
-    private IItem?[] _items;
+    private TItem?[] _items;
 
     #region Helpers
 
-    private IEnumerable<IItem> NotNullItems(bool backwards = false)
+    private IEnumerable<TItem> NotNullItems(bool backwards = false)
     {
         if (backwards)
             for (var index = Items.Length - 1; index >= 0; index--)
             {
                 var item = Items[index];
                 if (item is null) continue;
-                yield return item;
+                yield return item.Value;
             }
         else
             foreach (var item in Items)
             {
                 if (item is null) continue;
-                yield return item;
+                yield return item.Value;
             }
     }
 
@@ -32,7 +32,7 @@ public partial class Inventory
         return -1;
     }
 
-    private bool AreSameItems(IItem item0, IItem item1)
+    private bool AreSameItems(TItem item0, TItem item1)
     {
         return item0.Type.Id == item1.Type.Id;
     }
@@ -53,10 +53,24 @@ public partial class Inventory
         for (var i = backwards ? Items.Length - 1 : 0; backwards ? i > -1 : i < _items.Length; i += backwards ? -1 : 1)
         {
             var item = Items[i];
-            if (item != null && item.Type.Id == index) return i;
+            if (item != null && item.Value.Type.Id == index) return i;
         }
 
         return -1;
+    }
+
+    private TItem AddIItemStackAmount(TItem item, int deltaValue)
+    {
+        var itemStack = (IItemStack) item;
+        itemStack.Amount += deltaValue;
+        return (TItem) itemStack;
+    }
+
+    private void SetIItemStackAmount(ref TItem item, int value)
+    {
+        var itemStack = (IItemStack) item;
+        itemStack.Amount = value;
+        item = (TItem) itemStack;
     }
 
     #endregion

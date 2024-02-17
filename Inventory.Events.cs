@@ -1,7 +1,9 @@
 ﻿// ReSharper disable UnusedAutoPropertyAccessor.Global
+// ReSharper disable MemberCanBePrivate.Global
+
 namespace InventorySystem;
 
-public partial class Inventory
+public partial class Inventory<TItem> where TItem : struct, IItem
 {
     #region Events
 
@@ -18,7 +20,7 @@ public partial class Inventory
 
     public class InventorySizeChangedEventArgs : EventArgs
     {
-        public InventorySizeChangedEventArgs(int deltaSize, int newSize, int prevSize, List<IItem> removedItems)
+        public InventorySizeChangedEventArgs(int deltaSize, int newSize, int prevSize, List<TItem> removedItems)
         {
             DeltaSize = deltaSize;
             NewSize = newSize;
@@ -29,12 +31,12 @@ public partial class Inventory
         public int PrevSize { get; }
         public int NewSize { get; }
         public int DeltaSize { get; }
-        public List<IItem> RemovedItems { get; }
+        public List<TItem> RemovedItems { get; }
     }
 
     public class ItemAddedEventArgs : EventArgs
     {
-        public ItemAddedEventArgs(IItem? addedItems, IItem? rejectedItems, bool occupiedNewSlots, bool fitInInventory)
+        public ItemAddedEventArgs(TItem? addedItems, TItem? rejectedItems, bool occupiedNewSlots, bool fitInInventory)
         {
             AddedItems = addedItems;
             RejectedItems = rejectedItems;
@@ -42,39 +44,39 @@ public partial class Inventory
             FitInInventory = fitInInventory;
         }
 
-        public IItem? AddedItems { get; }
-        public IItem? RejectedItems { get; }
+        public TItem? AddedItems { get; }
+        public TItem? RejectedItems { get; }
         public bool OccupiedNewSlots { get; }
         public bool FitInInventory { get; }
     }
 
     public class ItemRemovedEventArgs : EventArgs
     {
-        public ItemRemovedEventArgs(bool removed, IItem? removable)
+        public ItemRemovedEventArgs(bool removed, TItem? removable)
         {
             Removed = removed;
             Removable = removable;
         }
 
-        public IItem? Removable { get; }
+        public TItem? Removable { get; }
         public bool Removed { get; }
     }
 
     public class FilterAppliedEventArgs : EventArgs
     {
-        public FilterAppliedEventArgs(Func<IItem, bool> filter, IItem[] result)
+        public FilterAppliedEventArgs(Func<TItem, bool> filter, TItem[] result)
         {
             Filter = filter;
             Result = result;
         }
 
-        public Func<IItem, bool> Filter { get; }
-        public IItem[] Result { get; }
+        public Func<TItem, bool> Filter { get; }
+        public TItem[] Result { get; }
     }
 
     public class ItemSwappedEventArgs : EventArgs
     {
-        public ItemSwappedEventArgs(bool isAnythingRemoved, IItem? removedItem, IItem insertedItemType)
+        public ItemSwappedEventArgs(bool isAnythingRemoved, TItem? removedItem, TItem insertedItemType)
         {
             IsAnythingRemoved = isAnythingRemoved;
             RemovedItem = removedItem;
@@ -82,8 +84,8 @@ public partial class Inventory
         }
 
         public bool IsAnythingRemoved { get; }
-        public IItem? RemovedItem { get; }
-        public IItem InsertedItemType { get; }
+        public TItem? RemovedItem { get; }
+        public TItem InsertedItemType { get; }
     }
 
     #endregion
