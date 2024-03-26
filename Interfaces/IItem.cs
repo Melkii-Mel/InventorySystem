@@ -14,3 +14,34 @@ public interface IItem
     /// </summary>
     IItemType Type { get; }
 }
+
+public sealed class ItemInfo
+{
+    public ItemInfo(IItemType type, int amount)
+    {
+        Type = type;
+        Amount = amount;
+    }
+
+    public ItemInfo(IItemStack item, int amount)
+    {
+        Type = item.Type;
+        Amount = amount;
+    }
+
+    public ItemInfo(IItem item)
+    {
+        Type = item.Type;
+        Amount = 1;
+    }
+
+    /// <summary>
+    /// Type of the item
+    /// </summary>
+    public IItemType Type { get; }
+    
+    /// <summary>
+    /// Amount of items (if it's an IItemStack)
+    /// </summary>
+    public int Amount { get; internal set; }
+}

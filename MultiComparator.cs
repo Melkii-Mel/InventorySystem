@@ -4,11 +4,11 @@ using InventorySystem.Interfaces;
 
 namespace InventorySystem;
 
-public class MultiComparator<TItem> : IComparer<TItem?> where TItem : struct, IItem
+public class MultiComparator : IComparer<IItem?>
 {
     private string _currentComparator;
 
-    public MultiComparator(Dictionary<string, Func<TItem, TItem, int>> comparators, string initialComparator)
+    public MultiComparator(Dictionary<string, Func<IItem, IItem, int>> comparators, string initialComparator)
     {
         Comparators = comparators;
         _currentComparator = initialComparator;
@@ -26,17 +26,17 @@ public class MultiComparator<TItem> : IComparer<TItem?> where TItem : struct, II
     }
 
     // ReSharper disable once MemberCanBePrivate.Global
-    public Dictionary<string, Func<TItem, TItem, int>> Comparators { get; }
+    public Dictionary<string, Func<IItem, IItem, int>> Comparators { get; }
 
-    public int Compare(TItem? x, TItem? y)
+    public int Compare(IItem? x, IItem? y)
     {
         if (x == null && y == null) return 0;
         if (x == null) return -1;
-        return y == null ? 1 : Comparators[CurrentComparator](x.Value, y.Value);
+        return y == null ? 1 : Comparators[CurrentComparator](x, y);
     }
 
-    public static MultiComparator<TItem> CreateBlank()
+    public static MultiComparator CreateBlank()
     {
-        return new MultiComparator<TItem>(new Dictionary<string, Func<TItem, TItem, int>>(), string.Empty);
+        return new MultiComparator(new(), string.Empty);
     }
 }

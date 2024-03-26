@@ -2,26 +2,26 @@
 
 namespace InventorySystem.InventoryComponents;
 
-public partial class Inventory<TItem> where TItem : struct, IItem
+public partial class Inventory
 {
-    private TItem?[] _items;
+    private IItem?[] _items;
 
     #region Helpers
 
-    private IEnumerable<TItem> NotNullItems(bool backwards = false)
+    private IEnumerable<IItem> NotNullItems(bool backwards = false)
     {
         if (backwards)
             for (var index = Items.Length - 1; index >= 0; index--)
             {
                 var item = Items[index];
                 if (item is null) continue;
-                yield return item.Value;
+                yield return item;
             }
         else
             foreach (var item in Items)
             {
                 if (item is null) continue;
-                yield return item.Value;
+                yield return item;
             }
     }
 
@@ -34,9 +34,9 @@ public partial class Inventory<TItem> where TItem : struct, IItem
         return -1;
     }
 
-    private bool AreSameItems(TItem item0, TItem item1)
+    private bool AreSameItems(IItem? item0, IItem? item1)
     {
-        return item0.Type.Id == item1.Type.Id;
+        return item0 != null && item1 != null && item0.Type.Id == item1.Type.Id;
     }
 
     private void RemoveItemFromArray(IItem removable)
@@ -55,24 +55,69 @@ public partial class Inventory<TItem> where TItem : struct, IItem
         for (var i = backwards ? Items.Length - 1 : 0; backwards ? i > -1 : i < _items.Length; i += backwards ? -1 : 1)
         {
             var item = Items[i];
-            if (item != null && item.Value.Type.Id == index) return i;
+            if (item != null && item.Type.Id == index) return i;
         }
 
         return -1;
     }
 
-    private TItem AddIItemStackAmount(TItem item, int deltaValue)
+    private IItem AddIItemStackAmount(IItem item, int deltaValue)
     {
         var itemStack = (IItemStack) item;
         itemStack.Amount += deltaValue;
-        return (TItem) itemStack;
+        return (IItem) itemStack;
     }
 
-    private void SetIItemStackAmount(ref TItem item, int value)
+    private InsertionInfo AddStack(IItemStack addableStack)
     {
-        var itemStack = (IItemStack) item;
-        itemStack.Amount = value;
-        item = (TItem) itemStack;
+
+        InsertionInfo insertion = new()
+        {
+            FitInOccupiedSlots = true
+        };
+        var totalAmount = addableStack.Amount;
+
+        void SetInsertionInfo()
+        {
+            insertion.FitInInventory = addableStack.Amount == 0;
+            if (totalAmount - addableStack.Amount != 0) 
+                insertion.InsertedItems = new() { new(addableStack.Type, totalAmount - addableStack.Amount) };
+            if (addableStack.Amount != 0)
+                insertion.RejectedItems = new() { new(addableStack.Type, addableStack.Amount) };
+        }
+
+        for (var i = 0; i < _items.Length; i++)
+        {
+            var item = _items[i];
+            if (!AreSameItems(item, addableStack)) continue;
+            IItemStack itemStack = (IItemStack)item!;
+            itemStack.Stack(addableStack);
+            if (addableStack.Amount == 0)
+            {
+                SetInsertionInfo();
+                return insertion;
+            }
+        }
+
+        insertion.FitInOccupiedSlots = false;
+
+        if (IsFull)
+        {
+            SetInsertionInfo();
+            return insertion;
+        }
+
+        while (addableStack.Amount > 0 && !IsFull)
+        {
+            IItemStack newStack = addableStack.CreateEmptyClone();
+            var deltaAmount = Math.Min(addableStack.Type.MaxStackSize, addableStack.Amount);
+            newStack.Amount = deltaAmount;
+            addableStack.Amount -= deltaAmount;
+            Items[FindFirstEmptySlot()] = newStack;
+        }
+
+        SetInsertionInfo();
+        return insertion;
     }
 
     #endregion
@@ -83,10 +128,10 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     {
         InventorySizeChanged?.Invoke(this, args);
     }
-
-    protected virtual void OnItemInserted(ItemAddedEventArgs args)
+    
+    protected virtual void OnItemInserted(InsertionInfo info)
     {
-        ItemInserted?.Invoke(this, args);
+        ItemInserted?.Invoke(this, new ItemAddedEventArgs(info));
     }
 
     protected virtual void OnItemRemoved(ItemRemovedEventArgs args)

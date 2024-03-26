@@ -11,7 +11,7 @@ namespace InventorySystem.InventoryComponents;
 ///     Stackable items represented as IItemStack inheritors
 /// </summary>
 [Serializable]
-public partial class Inventory<TItem> where TItem : struct, IItem
+public partial class Inventory
 {
     /// <summary>
     ///     Initializes a new instance of the Inventory class with the specified size.
@@ -21,24 +21,24 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     ///     A MultiComparator object used for sorting items in the inventory.
     ///     If sorting is not required, use MultiComparator.CreateBlank().
     /// </param>
-    public Inventory(int size, MultiComparator<TItem> comparator)
+    public Inventory(int size, MultiComparator comparator)
     {
         Comparator = comparator;
-        _items = new TItem?[size];
+        _items = new IItem?[size];
     }
 
     /// <summary>
     ///     All items containing in inventory
     ///     Manually adding or removing them is not recommended, use AddItem or TakeItem instead
     /// </summary>
-    public TItem?[] Items
+    public IItem?[] Items
     {
         get => _items;
         set => _items = value;
     }
 
     // ReSharper disable once MemberCanBePrivate.Global
-    public MultiComparator<TItem> Comparator { get; set; }
+    public MultiComparator Comparator { get; set; }
 
     /// <summary>
     ///     Gets a value indicating whether the inventory is full.
@@ -94,15 +94,16 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     /// </summary>
     /// <param name="deltaSize">The change in size, which can be positive or negative.</param>
     /// <returns>A list of items that were removed due to slot resizing.</returns>
-    public List<TItem> ChangeSize(int deltaSize)
+    public List<IItem> ChangeSize(int deltaSize)
     {
         if (deltaSize + Items.Length < 0)
             throw new ArgumentException("Value is too low. deltaSize can't be less than -Items.Length");
-        List<TItem> removedItems = new();
+        List<IItem> removedItems = new();
         for (var i = Items.Length - deltaSize; i < Items.Length; i++)
         {
             if (Items[i] is null) continue;
-            removedItems.Add(Items[i]!.Value);
+            removedItems.Add(Items[i]!);
+            Items[i] = null;
         }
 
         Array.Resize(ref _items, Items.Length + deltaSize);
@@ -112,81 +113,48 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     }
 
     /// <summary>
-    ///     Inserts an item into the inventory.
+    ///     Inserts an item into an inventory.
     /// </summary>
-    /// <param name="addable">The item to be added to the inventory.</param>
+    /// <param name="addables">Items to be added to the inventory.</param>
     /// <returns>An InsertionInfo object containing information about the insertion operation.</returns>
-    public InsertionInfo<TItem> InsertItem(TItem addable)
+    public InsertionInfo InsertItems(params IItem[] addables)
     {
-        var insertionInfo = new InsertionInfo<TItem>
+        var insertionInfo = new InsertionInfo
         {
             FitInInventory = true,
             FitInOccupiedSlots = true,
-            InsertedItem = addable
+            InsertedItems = new()
         };
 
-        if (addable is IItemStack addableStack)
+        int addableStacksCounter = 0;
+        foreach (IItemStack addableStack in addables.Cast<IItemStack>())
         {
-            var totalAmount = addableStack.Amount;
-            for (var i = 0; i < _items.Length; i++)
-            {
-                var item = _items[i];
-                if (item is null) continue;
-                if (item.Value.Type != addableStack.Type) continue;
-                var itemStack = (IItemStack) item.Value;
-                addableStack = itemStack.Stack(addableStack);
-                _items[i] = (TItem?) itemStack;
-                if (addableStack.Amount == 0) break;
-            }
+            addableStacksCounter++;
+            InsertionInfo info = AddStack(addableStack);
+            insertionInfo.Merge(info);
+        }
 
-            if (addableStack.Amount == 0)
-            {
-                insertionInfo.FitInOccupiedSlots = true;
-                OnItemInserted(new ItemAddedEventArgs(addable, null, !insertionInfo.FitInOccupiedSlots, true));
-                return insertionInfo;
-            }
-
-            insertionInfo.FitInOccupiedSlots = false;
-
-            if (IsFull)
-            {
-                insertionInfo.FitInInventory = false;
-                var insertedItemsStack = (IItemStack) addable;
-                insertedItemsStack.Amount = totalAmount - addableStack.Amount;
-                OnItemInserted(new ItemAddedEventArgs((TItem) insertedItemsStack, (TItem) addableStack,
-                    !insertionInfo.FitInOccupiedSlots,
-                    true));
-                return insertionInfo;
-            }
-
-            while (addableStack.Amount > 0)
-            {
-                var newAddable = (TItem) addableStack;
-                var deltaAmount = Math.Min(addableStack.Type.MaxStackSize, addableStack.Amount);
-                SetIItemStackAmount(ref newAddable, deltaAmount);
-                addableStack.Amount -= deltaAmount;
-                Items[FindFirstEmptySlot()] = newAddable;
-                if (IsFull) break;
-            }
-
-            var itemsInserted = (TItem) addableStack;
-            SetIItemStackAmount(ref itemsInserted, totalAmount - addableStack.Amount);
-            OnItemInserted(new ItemAddedEventArgs(itemsInserted, (TItem) addableStack,
-                !insertionInfo.FitInOccupiedSlots,
-                insertionInfo.FitInInventory));
+        if (addableStacksCounter == addables.Length)
+        {
+            OnItemInserted(insertionInfo);
             return insertionInfo;
         }
 
         insertionInfo.FitInOccupiedSlots = false;
-        if (IsFull)
+
+        foreach (IItem addable in addables)
         {
-            insertionInfo.FitInInventory = false;
-            OnItemInserted(new ItemAddedEventArgs(null, addable, false, false));
-            return insertionInfo;
+            if (addable is IItemStack) continue;
+            if (IsFull)
+            {
+                insertionInfo.RejectedItems.Add(new ItemInfo(addable));
+                continue;
+            }
+            Items[FindFirstEmptySlot()] = addable;
+            insertionInfo.InsertedItems.Add(new ItemInfo(addable));
         }
 
-        Items[FindFirstEmptySlot()] = addable;
-        OnItemInserted(new ItemAddedEventArgs(addable, null, false, true));
+        OnItemInserted(insertionInfo);
         return insertionInfo;
     }
 
@@ -198,54 +166,47 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     /// <returns>
     ///     An InsertionInfo object containing information about the insertion operation
     /// </returns>
-    public InsertionInfo<TItem> InsertItem(TItem addable, int index)
+    public InsertionInfo InsertItem(IItem addable, int index = -1)
     {
-        var insertionInfo = new InsertionInfo<TItem>
-        {
-            FitInOccupiedSlots = false,
-            FitInInventory = false,
-            InsertedItem = addable
-        };
+        if (index == -1) return InsertItems(addable);
+
+        var insertionInfo = new InsertionInfo();
+
         var item = Items[index];
         if (item is null)
         {
-            Items[index] = addable;
-            insertionInfo.FitInOccupiedSlots = false;
             insertionInfo.FitInInventory = true;
-            OnItemInserted(new ItemAddedEventArgs(addable, null, true, true));
+            insertionInfo.FitInOccupiedSlots = false;
+            Items[index] = addable;
+            insertionInfo.InsertedItems = new() { new ItemInfo(addable) };
+            OnItemInserted(insertionInfo);
             return insertionInfo;
         }
 
-        if (addable is not IItemStack addableStack)
+        if (addable is not IItemStack addableStack || !AreSameItems(addable, item))
         {
             insertionInfo.FitInOccupiedSlots = false;
             insertionInfo.FitInInventory = false;
-            OnItemInserted(new ItemAddedEventArgs(null, addable, false, false));
+            insertionInfo.RejectedItems = new() { new ItemInfo(addable) };
+            OnItemInserted(insertionInfo);
             return insertionInfo;
         }
 
-        if (!AreSameItems(addable, item.Value))
-        {
-            insertionInfo.FitInOccupiedSlots = false;
-            insertionInfo.FitInInventory = false;
-            OnItemInserted(new ItemAddedEventArgs(null, addable, false, false));
-            return insertionInfo;
-        }
-
-        var itemStack = (IItemStack) item.Value;
+        var itemStack = (IItemStack) item;
         var initialAmount = addableStack.Amount;
-        addableStack = itemStack.Stack(addableStack);
-        _items[index] = (TItem) itemStack;
-        var insertedStack = addableStack;
-        insertedStack.Amount = initialAmount - addableStack.Amount;
-        OnItemInserted(new ItemAddedEventArgs((TItem) insertedStack, (TItem) addableStack, false,
-            addableStack.Amount == 0));
-        return new InsertionInfo<TItem>
+        itemStack.Stack(addableStack);
+        if (itemStack.Amount < initialAmount)
         {
-            InsertedItem = addable,
-            FitInInventory = addableStack.Amount == 0,
-            FitInOccupiedSlots = addableStack.Amount == 0
-        };
+            insertionInfo.InsertedItems.Add(new ItemInfo(addableStack.Type, initialAmount - itemStack.Amount));
+        }
+        if (itemStack.Amount > 0)
+        { 
+            insertionInfo.RejectedItems.Add(new ItemInfo(addableStack.Type, itemStack.Amount));
+        }
+        insertionInfo.FitInInventory = addableStack.Amount == 0;
+        insertionInfo.FitInOccupiedSlots = addableStack.Amount == 0;
+        OnItemInserted(insertionInfo);
+        return insertionInfo;
     }
 
     /// <summary>
@@ -254,7 +215,7 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     /// <param name="insertable">Item that will be inserted</param>
     /// <param name="slot">Slot in which an item will be inserted</param>
     /// <returns>Removed item?</returns>
-    public TItem? SwapItems(TItem insertable, int slot)
+    public IItem? SwapItems(IItem insertable, int slot)
     {
         var removable = Items[slot];
         Items[slot] = insertable;
@@ -267,21 +228,21 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     /// </summary>
     /// <param name="takeables">Items to be removed from the inventory</param>
     /// <returns>True if the item was successfully removed; otherwise, false.</returns>
-    public bool TryTakeItems(params TItem[] takeables)
+    public bool TryTakeItems(params IItem[] takeables)
     {
         if (!IsEnoughItems(takeables)) return false;
 
         IItem?[] takeablesSingles =
-            takeables.Where(item => item is not IItemStack).Select(item => item as IItem).ToArray();
+            takeables.Where(item => item is not IItemStack && item is not null).ToArray();
         var takeableStacks = takeables.OfType<IItemStack>().ToArray();
-        for (var i = _items.Length - 1; i > -1; i--)
+        for (int i = _items.Length - 1; i > -1; i--)
         {
-            var item = _items[i];
-            if (item is null) continue;
-            if (item is IItemStack itemStack)
+            var currentInventoryItem = _items[i];
+            if (currentInventoryItem is null) continue;
+            if (currentInventoryItem is IItemStack itemStack)
                 foreach (var takeableStack in takeableStacks)
                 {
-                    if (!AreSameItems((TItem) takeableStack, (TItem) item)) continue;
+                    if (!AreSameItems(takeableStack, currentInventoryItem)) continue;
                     var deltaAmount = Math.Min(takeableStack.Amount, itemStack.Amount);
                     takeableStack.Amount -= deltaAmount;
                     itemStack.Amount -= deltaAmount;
@@ -291,12 +252,12 @@ public partial class Inventory<TItem> where TItem : struct, IItem
                         break;
                     }
 
-                    _items[i] = (TItem) itemStack;
+                    _items[i] = itemStack;
                 }
             else
-                for (var index = 0; index < takeablesSingles.Length; index++)
+                for (int index = 0; index < takeablesSingles.Length; index++)
                 {
-                    if (!AreSameItems((TItem) takeableStacks[index], (TItem) item)) continue;
+                    if (!AreSameItems(takeableStacks[index], currentInventoryItem)) continue;
                     takeablesSingles[index] = null;
                     _items[i] = null;
                     break;
@@ -310,9 +271,9 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     ///     returns all items with the specified Item Type
     /// </summary>
     /// <param name="type">Type of receivable items</param>
-    public TItem[] GetItems(IItemType type)
+    public IItem[] GetItems(IItemType type)
     {
-        return Items.Where(item => item.HasValue && item.Value.Type == type).Select(item => item!.Value).ToArray();
+        return Items.Where(item => item != null && item.Type == type).ToArray()!;
     }
 
     /// <summary>
@@ -326,34 +287,42 @@ public partial class Inventory<TItem> where TItem : struct, IItem
         return GetItems(type).Length;
     }
 
-    public bool IsEnoughItems(TItem[] initialTakeableItems)
+    public bool IsEnoughItems(IItem[] takeableItems)
     {
-        var notNullItems = NotNullItems().ToArray();
-        var takeableItems = (TItem[]) initialTakeableItems.Clone();
         var takeablesAmounts = new int[takeableItems.Length];
+        
         for (var i = 0; i < takeableItems.Length; i++)
         {
             var takeable = takeableItems[i];
             takeablesAmounts[i] = takeable is IItemStack takeableStack ? takeableStack.Amount : 1;
         }
 
-        for (var notNullItemIndex = 0; notNullItemIndex < notNullItems.Length; notNullItemIndex++)
+        foreach (IItem item in NotNullItems())
         {
-            var notNullItem = notNullItems[notNullItemIndex];
-            for (var takeableAmountIndex = 0; takeableAmountIndex < takeablesAmounts.Length; takeableAmountIndex++)
+            if (item is IItemStack itemStack)
             {
-                var takeable = takeableItems[takeableAmountIndex];
-                if (takeable is IItemStack takeableStack)
+                int itemStackAmount = itemStack.Amount;
+                for (int i = 0; i < takeableItems.Length; i++)
                 {
-                    if (!AreSameItems(notNullItem, takeableItems[takeableAmountIndex])) continue;
-                    var itemStack = (notNullItem as IItemStack)!;
-                    var deltaAmount = Math.Min(itemStack.Amount, takeableStack.Amount);
-                    takeablesAmounts[takeableAmountIndex] -= deltaAmount;
-                    takeableStack.Amount -= deltaAmount;
-                    takeableItems[takeableAmountIndex] = (TItem) takeableStack;
-                    (notNullItem as IItemStack)!.Amount -= deltaAmount;
-                    notNullItems[notNullItemIndex] = notNullItem;
-                    if ((notNullItem as IItemStack)!.Amount == 0) break;
+                    if (takeableItems[i] is not IItemStack takeableItemStack) continue;
+                    if (!AreSameItems(takeableItemStack, itemStack)) continue;
+                    int deltaAmount = Math.Min(takeablesAmounts[i], itemStackAmount);
+                    takeablesAmounts[i] -= deltaAmount;
+                    itemStackAmount -= deltaAmount;
+
+                    if (itemStackAmount == 0) break;
+                }
+            }
+
+            else
+            {
+                for (int i = 0; i < takeableItems.Length; i++)
+                {
+                    if (takeableItems[i] is IItemStack) continue;
+                    IItem takeableItem = takeableItems[i];
+                    if (!AreSameItems(takeableItem, item)) continue;
+                    takeablesAmounts[i] = 0;
+                    break;
                 }
             }
         }
@@ -409,9 +378,9 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     /// </summary>
     /// <param name="predicate">The predicate used to filter the items.</param>
     /// <returns>An array of items that satisfy the predicate condition.</returns>
-    public TItem[] FilterItems(Func<TItem, bool> predicate)
+    public IItem[] FilterItems(Func<IItem, bool> predicate)
     {
-        var result = Items.Where(item => item != null && predicate(item.Value)).Select(item => item!.Value).ToArray();
+        IItem[] result = Items.Where(item => item != null && predicate(item)).ToArray()!;
         OnFilterApplied(new FilterAppliedEventArgs(predicate, result));
         return result;
     }
@@ -419,28 +388,59 @@ public partial class Inventory<TItem> where TItem : struct, IItem
     /// <summary>
     ///     Being generated by AddItem method, provides data about operation result
     /// </summary>
-    public struct InsertionInfo<T> where T : IItem
+    public struct InsertionInfo
     {
         /// <summary>
         ///     Item that has been inserted
         /// </summary>
-        public T? InsertedItem { get; internal set; }
+        public List<ItemInfo> InsertedItems { get; internal set; } = new();
 
         /// <summary>
         ///     Item that has not been inserted due to lack of space
         /// </summary>
-        public T? RejectedItem { get; internal set; }
+        public List<ItemInfo> RejectedItems { get; internal set; } = new();
 
         /// <summary>
         ///     True if item was successfully inserted in the inventory
         /// </summary>
         // ReSharper disable once UnusedAutoPropertyAccessor.Global
-        public bool FitInInventory { get; internal set; }
+        public bool FitInInventory { get; internal set; } = false;
 
         /// <summary>
         ///     True if item didn't occupy any additional slot
         /// </summary>
         // ReSharper disable once UnusedAutoPropertyAccessor.Global
-        public bool FitInOccupiedSlots { get; internal set; }
+        public bool FitInOccupiedSlots { get; internal set; } = false;
+
+        public InsertionInfo()
+        {
+            
+        }
+
+        public void Merge(InsertionInfo other)
+        {
+            static void MergeItems(List<ItemInfo> from, List<ItemInfo> to)
+            {
+                foreach (var fromItem in from)
+                {
+                    bool inserted = false;
+                    foreach (var item in to)
+                    {
+                        if (item.Type == fromItem.Type)
+                        {
+                            item.Amount += fromItem.Amount;
+                            inserted = true;
+                            break;
+                        }
+                    }
+                    if (inserted) continue;
+                    to.Add(fromItem);
+                }
+            }
+            MergeItems(other.InsertedItems, InsertedItems);
+            MergeItems(other.RejectedItems, RejectedItems);
+            FitInInventory = FitInInventory && other.FitInInventory;
+            FitInOccupiedSlots = FitInOccupiedSlots && other.FitInOccupiedSlots;
+        }
     }
 }

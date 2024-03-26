@@ -17,17 +17,18 @@ public interface IItemStack : IItem
     public int Amount { get; set; }
 
     /// <summary>
-    ///     Stacks this item with another item of the same type, increasing its amount.
+    ///     Stacks this item with another item of the same type, increasing amount of this stack and decreasing amount of stackFrom stack.
     /// </summary>
-    /// <param name="itemType">The item to stack with this one.</param>
+    /// <param name="stackFrom">The item to stack with this one</param>
     /// <exception cref="ArgumentException">Thrown when trying to stack different items</exception>
     /// <returns>The remaining item after stacking, if any.</returns>
-    public IItemStack Stack(IItemStack itemType)
+    public void Stack(IItemStack stackFrom)
     {
-        if (itemType.Type != Type) throw new ArgumentException("These are different items and so can't be stacked");
-        var deltaAmount = Math.Min(Type.MaxStackSize - Amount, itemType.Amount);
-        itemType.Amount -= deltaAmount;
+        if (stackFrom.Type != Type) throw new ArgumentException("These are different items and so can't be stacked");
+        var deltaAmount = Math.Min(Type.MaxStackSize - Amount, stackFrom.Amount);
+        stackFrom.Amount -= deltaAmount;
         Amount += deltaAmount;
-        return itemType;
     }
+
+    public IItemStack CreateEmptyClone();
 }

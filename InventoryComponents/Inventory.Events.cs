@@ -5,16 +5,16 @@ using InventorySystem.Interfaces;
 
 namespace InventorySystem.InventoryComponents;
 
-public partial class Inventory<TItem> where TItem : struct, IItem
+public partial class Inventory
 {
     #region Events
 
-    public event EventHandler? InventorySizeChanged;
-    public event EventHandler? ItemInserted;
-    public event EventHandler? ItemRemoved;
-    public event EventHandler? FilterApplied;
+    public event EventHandler<InventorySizeChangedEventArgs>? InventorySizeChanged;
+    public event EventHandler<ItemAddedEventArgs>? ItemInserted;
+    public event EventHandler<ItemRemovedEventArgs>? ItemRemoved;
+    public event EventHandler<FilterAppliedEventArgs>? FilterApplied;
     public event EventHandler? InventorySorted;
-    public event EventHandler? ItemSwapped;
+    public event EventHandler<ItemSwappedEventArgs>? ItemSwapped;
 
     #endregion
 
@@ -22,7 +22,7 @@ public partial class Inventory<TItem> where TItem : struct, IItem
 
     public class InventorySizeChangedEventArgs : EventArgs
     {
-        public InventorySizeChangedEventArgs(int deltaSize, int newSize, int prevSize, List<TItem> removedItems)
+        public InventorySizeChangedEventArgs(int deltaSize, int newSize, int prevSize, List<IItem> removedItems)
         {
             DeltaSize = deltaSize;
             NewSize = newSize;
@@ -33,52 +33,46 @@ public partial class Inventory<TItem> where TItem : struct, IItem
         public int PrevSize { get; }
         public int NewSize { get; }
         public int DeltaSize { get; }
-        public List<TItem> RemovedItems { get; }
+        public List<IItem> RemovedItems { get; }
     }
 
     public class ItemAddedEventArgs : EventArgs
     {
-        public ItemAddedEventArgs(TItem? addedItems, TItem? rejectedItems, bool occupiedNewSlots, bool fitInInventory)
+        public ItemAddedEventArgs(InsertionInfo insertion)
         {
-            AddedItems = addedItems;
-            RejectedItems = rejectedItems;
-            OccupiedNewSlots = occupiedNewSlots;
-            FitInInventory = fitInInventory;
+            InsertionInfo = insertion;
         }
 
-        public TItem? AddedItems { get; }
-        public TItem? RejectedItems { get; }
-        public bool OccupiedNewSlots { get; }
-        public bool FitInInventory { get; }
+        public InsertionInfo InsertionInfo;
     }
 
     public class ItemRemovedEventArgs : EventArgs
     {
-        public ItemRemovedEventArgs(bool removed, TItem? removable)
+        public ItemRemovedEventArgs(bool removed, IItem? removable)
         {
             Removed = removed;
             Removable = removable;
         }
 
-        public TItem? Removable { get; }
+        public IItem? Removable { get; }
         public bool Removed { get; }
     }
 
     public class FilterAppliedEventArgs : EventArgs
     {
-        public FilterAppliedEventArgs(Func<TItem, bool> filter, TItem[] result)
+        public FilterAppliedEventArgs(Func<IItem, bool> filter, IItem[] result)
         {
             Filter = filter;
             Result = result;
         }
 
-        public Func<TItem, bool> Filter { get; }
-        public TItem[] Result { get; }
+        public Func<IItem, bool> Filter { get; }
+        public IItem[] Result { get; }
     }
 
     public class ItemSwappedEventArgs : EventArgs
     {
-        public ItemSwappedEventArgs(bool isAnythingRemoved, TItem? removedItem, TItem insertedItemType)
+        public ItemSwappedEventArgs(bool isAnythingRemoved, IItem? removedItem, IItem insertedItemType)
         {
             IsAnythingRemoved = isAnythingRemoved;
             RemovedItem = removedItem;
@@ -86,8 +80,8 @@ public partial class Inventory<TItem> where TItem : struct, IItem
         }
 
         public bool IsAnythingRemoved { get; }
-        public TItem? RemovedItem { get; }
-        public TItem InsertedItemType { get; }
+        public IItem? RemovedItem { get; }
+        public IItem InsertedItemType { get; }
     }
 
     #endregion
